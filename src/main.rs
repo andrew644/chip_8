@@ -65,7 +65,8 @@ impl Cpu {
         );
 
         match nibbles {
-            (0x00, 0x00, 0x0e, 0x00) => self.op_00E0(),
+            (0x00, 0x00, 0x0E, 0x00) => self.op_00E0(),
+            (0x00, 0x00, 0x0E, 0x0E) => self.op_00EE(),
             _ => self.next_pc(),
         }
     }
@@ -76,6 +77,13 @@ impl Cpu {
             self.gfx[i] = 0
         }
         //TODO set changed flag for gfx
+        self.next_pc();
+    }
+
+    // Return from subroutine
+    fn op_00EE(&mut self) {
+        self.sp -= 1;
+        self.pc = self.stack[self.sp as usize];
         self.next_pc();
     }
 
