@@ -1,42 +1,59 @@
 extern crate rand;
 
 use rand::Rng;
+use std::fs::File;
+use std::io::Read;
 
-const RAM_SIZE: usize = 4096;
+const RAM_SIZE: usize = 0x1000; // 4096
 const NUM_REGISTERS: usize = 16;
 const NUM_PIXELS: usize = 64 * 32;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
+const START_PC: usize = 0x200; // 512
+
+// Holds caracters 0 to F
+// Each character is 5 bytes
+const FONT_SET: [u8; 80] = [
+    0xF0, 0x90, 0x90, 0x90, 0xF0, 0x20, 0x60, 0x20, 0x20, 0x70, 0xF0, 0x10, 0xF0, 0x80, 0xF0, 0xF0,
+    0x10, 0xF0, 0x10, 0xF0, 0x90, 0x90, 0xF0, 0x10, 0x10, 0xF0, 0x80, 0xF0, 0x10, 0xF0, 0xF0, 0x80,
+    0xF0, 0x90, 0xF0, 0xF0, 0x10, 0x20, 0x40, 0x40, 0xF0, 0x90, 0xF0, 0x90, 0xF0, 0xF0, 0x90, 0xF0,
+    0x10, 0xF0, 0xF0, 0x90, 0xF0, 0x90, 0x90, 0xE0, 0x90, 0xE0, 0x90, 0xE0, 0xF0, 0x80, 0x80, 0x80,
+    0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0, 0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80,
+];
 
 pub struct Simulator {
     ram: [u8; RAM_SIZE],
 
     v: [u8; NUM_REGISTERS], // registers
     i: u16,                 // index register
-    pc: u16,
+    pc: u16,                // program counter
 
     stack: [u16; STACK_SIZE],
-    sp: u16,
+    sp: u16, // stack pointer
 
-    gfx: [u8; NUM_PIXELS],
+    gfx: [u8; NUM_PIXELS], // graphical memory (the screen)
     gfx_changed: bool,
 
     delay_timer: u8,
     sound_timer: u8,
 
-    key: [bool; NUM_KEYS],
+    key: [bool; NUM_KEYS], // keypad
 }
 
 impl Simulator {
     pub fn new() -> Self {
         let mut ram = [0u8; RAM_SIZE];
-        //TODO load font set
+
+        // load font set
+        for i in 0..FONT_SET.len() {
+            ram[i] = FONT_SET[i];
+        }
 
         Simulator {
             ram: ram,
             v: [0; NUM_REGISTERS],
             i: 0,
-            pc: 0x200,
+            pc: START_PC as u16,
             stack: [0; STACK_SIZE],
             sp: 0,
             gfx: [0; NUM_PIXELS],
@@ -47,8 +64,15 @@ impl Simulator {
         }
     }
 
-    // TODO
-    pub fn load_program(&mut self, program: &[u8]) {}
+    pub fn load_program(&mut self, program: &[u8]) {
+        for (i, &byte) in program.iter().enumerate() {
+            if START_PC + i < RAM_SIZE {
+                self.ram[START_PC + i] = byte;
+            } else {
+                break;
+            }
+        }
+    }
 
     fn get_opcode(&mut self) -> u16 {
         let pc = self.pc as usize;
@@ -332,25 +356,42 @@ impl Simulator {
 
     // Set I to location of sprite VX
     fn op_FX29(&mut self, x: usize) -> u16 {
-        self.i = (self.v[x] as usize) * 5;
+        self.i = (self.v[x] as u16) * 5;
         self.next_pc()
     }
 
-    //TODO
     // convert VX to decimal and store the three digits in ram at I, I+1, I+2
     fn op_FX33(&mut self, x: usize) -> u16 {
+        let vx = self.v[x];
+        self.ram[self.i as usize] = (vx / 100) % 10; // hundreds
+        self.ram[(self.i + 1) as usize] = (vx / 10) % 10; // tens
+        self.ram[(self.i + 2) as usize] = vx % 10; // ones
         self.next_pc()
     }
 
-    //TODO
     // Store V0 to VX in ram starting at I
     fn op_FX55(&mut self, x: usize) -> u16 {
+        let max_reg = match x {
+            0x00...0x0F => x,
+            _ => NUM_REGISTERS - 1, //TODO print warning about out of bounds
+        };
+        for reg in 0..max_reg + 1 {
+            //TODO check for out of bounds on ram
+            self.ram[(self.i as usize) + reg] = self.v[reg];
+        }
         self.next_pc()
     }
 
-    //TODO
     // Load V0 to VX with ram values starting at I
     fn op_FX65(&mut self, x: usize) -> u16 {
+        let max_reg = match x {
+            0x00...0x0F => x,
+            _ => NUM_REGISTERS - 1, //TODO print warning
+        };
+        for reg in 0..max_reg + 1 {
+            //TODO check for out of bounds on ram
+            self.v[reg] = self.ram[(self.i as usize) + reg];
+        }
         self.next_pc()
     }
 
@@ -365,10 +406,22 @@ impl Simulator {
 
 fn main() {
     let mut cpu = Simulator::new();
+    /*
     cpu.debug();
     //cpu.step(0x00E0);
-    cpu.step(0x6003);
+    cpu.step(0x601A);
     //cpu.step(0x6105);
-    cpu.step(0x8016);
+    cpu.step(0xF033);
     cpu.debug();
+    */
+
+    let mut file = File::open("roms/TETRIS").unwrap();
+    let mut buf = [0u8; RAM_SIZE];
+    file.read(&mut buf).unwrap();
+    cpu.load_program(&mut buf);
+    loop {
+        let opcode = cpu.get_opcode();
+        cpu.step(opcode);
+        cpu.debug();
+    }
 }
