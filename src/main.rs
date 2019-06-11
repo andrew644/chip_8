@@ -78,6 +78,31 @@ impl Cpu {
             (0x05, x, y, 0x00) => self.op_5XY0(x as usize, y as usize),
             (0x06, x, _, _) => self.op_6XNN(x as usize, nn),
             (0x07, x, _, _) => self.op_7XNN(x as usize, nn),
+            (0x08, x, y, 0x00) => self.op_8XY0(x as usize, y as usize),
+            (0x08, x, y, 0x01) => self.op_8XY1(x as usize, y as usize),
+            (0x08, x, y, 0x02) => self.op_8XY2(x as usize, y as usize),
+            (0x08, x, y, 0x03) => self.op_8XY3(x as usize, y as usize),
+            (0x08, x, y, 0x04) => self.op_8XY4(x as usize, y as usize),
+            (0x08, x, y, 0x05) => self.op_8XY5(x as usize, y as usize),
+            (0x08, x, y, 0x06) => self.op_8XY6(x as usize, y as usize),
+            (0x08, x, y, 0x07) => self.op_8XY7(x as usize, y as usize),
+            (0x08, x, y, 0x0E) => self.op_8XYE(x as usize, y as usize),
+            (0x09, x, y, 0x00) => self.op_9XY0(x as usize, y as usize),
+            (0x0A, _, _, _) => self.op_ANNN(nnn),
+            (0x0B, _, _, _) => self.op_BNNN(nnn),
+            (0x0C, x, _, _) => self.op_CXNN(x as usize, nn),
+            (0x0D, x, y, n) => self.op_DXYN(x as usize, y as usize, n as u8),
+            (0x0E, x, 0x09, 0x0E) => self.op_EX9E(x as usize),
+            (0x0E, x, 0x0A, 0x01) => self.op_EXA1(x as usize),
+            (0x0F, x, 0x00, 0x07) => self.op_FX07(x as usize),
+            (0x0F, x, 0x00, 0x0A) => self.op_FX0A(x as usize),
+            (0x0F, x, 0x01, 0x05) => self.op_FX15(x as usize),
+            (0x0F, x, 0x01, 0x08) => self.op_FX18(x as usize),
+            (0x0F, x, 0x01, 0x0E) => self.op_FX1E(x as usize),
+            (0x0F, x, 0x02, 0x09) => self.op_FX29(x as usize),
+            (0x0F, x, 0x03, 0x03) => self.op_FX33(x as usize),
+            (0x0F, x, 0x05, 0x05) => self.op_FX55(x as usize),
+            (0x0F, x, 0x06, 0x05) => self.op_FX65(x as usize),
             _ => self.next_pc(), //TODO message that we couldn't find opcode
         }
     }
@@ -148,6 +173,156 @@ impl Cpu {
         //TODO is this needed?
         // Do the addition as u16 then truncate to u8 so we don't roll over
         self.v[x] = ((self.v[x] as u16) + (nn as u16)) as u8;
+        self.next_pc()
+    }
+
+    // Set VX to VY
+    fn op_8XY0(&mut self, x: usize, y: usize) -> u16 {
+        self.v[x] = self.v[y];
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to VX or VY
+    fn op_8XY1(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to VX and VY
+    fn op_8XY2(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to VX xor VY
+    fn op_8XY3(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Add VY to VX and use VF as carry bit
+    fn op_8XY4(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Subtract VY from VX and use VF as borrow bit
+    fn op_8XY5(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Put least significant bit from VX in VF then shift VX right once
+    fn op_8XY6(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to VY - VX and use VF as borrow bit
+    fn op_8XY7(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Put most significant bit from VX in VF then shift VX left once
+    fn op_8XYE(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Skip if VX != VY
+    fn op_9XY0(&mut self, x: usize, y: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set I to NNN
+    fn op_ANNN(&mut self, nnn: u16) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Jump to NNN + V0
+    fn op_BNNN(&mut self, nnn: u16) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to NN bitwise and a random number
+    fn op_CXNN(&mut self, x: usize, nn: u8) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Draw a sprite
+    fn op_DXYN(&mut self, x: usize, y: usize, n: u8) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Skip if key stored in VX is pressed
+    fn op_EX9E(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Skip if key stored in VX isn't pressed
+    fn op_EXA1(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set VX to delay timer
+    fn op_FX07(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Store next key press in VX and block until key is pressed
+    fn op_FX0A(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set delay timer to VX
+    fn op_FX15(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set sound timer to VX
+    fn op_FX18(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Add VX to I
+    fn op_FX1E(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Set I to location of sprite VX
+    fn op_FX29(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // convert VX to decimal and store the three digits in ram at I, I+1, I+2
+    fn op_FX33(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Store V0 to VX in ram starting at I
+    fn op_FX55(&mut self, x: usize) -> u16 {
+        self.next_pc()
+    }
+
+    //TODO
+    // Load V0 to VX with ram values starting at I
+    fn op_FX65(&mut self, x: usize) -> u16 {
         self.next_pc()
     }
 
