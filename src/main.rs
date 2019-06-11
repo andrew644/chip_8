@@ -1,10 +1,14 @@
+extern crate rand;
+
+use rand::Rng;
+
 const RAM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const NUM_PIXELS: usize = 64 * 32;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 
-pub struct Cpu {
+pub struct Simulator {
     ram: [u8; RAM_SIZE],
 
     v: [u8; NUM_REGISTERS], // registers
@@ -15,6 +19,7 @@ pub struct Cpu {
     sp: u16,
 
     gfx: [u8; NUM_PIXELS],
+    gfx_changed: bool,
 
     delay_timer: u8,
     sound_timer: u8,
@@ -22,12 +27,12 @@ pub struct Cpu {
     key: [bool; NUM_KEYS],
 }
 
-impl Cpu {
+impl Simulator {
     pub fn new() -> Self {
         let mut ram = [0u8; RAM_SIZE];
         //TODO load font set
 
-        Cpu {
+        Simulator {
             ram: ram,
             v: [0; NUM_REGISTERS],
             i: 0,
@@ -35,12 +40,14 @@ impl Cpu {
             stack: [0; STACK_SIZE],
             sp: 0,
             gfx: [0; NUM_PIXELS],
+            gfx_changed: false,
             delay_timer: 0,
             sound_timer: 0,
             key: [false; NUM_KEYS],
         }
     }
 
+    // TODO
     pub fn load_program(&mut self, program: &[u8]) {}
 
     fn get_opcode(&mut self) -> u16 {
@@ -112,7 +119,7 @@ impl Cpu {
         for i in 0..NUM_PIXELS {
             self.gfx[i] = 0
         }
-        //TODO set changed flag for gfx
+        self.gfx_changed = true;
         self.next_pc()
     }
 
@@ -182,99 +189,118 @@ impl Cpu {
         self.next_pc()
     }
 
-    //TODO
     // Set VX to VX or VY
     fn op_8XY1(&mut self, x: usize, y: usize) -> u16 {
+        self.v[x] |= self.v[y];
         self.next_pc()
     }
 
-    //TODO
     // Set VX to VX and VY
     fn op_8XY2(&mut self, x: usize, y: usize) -> u16 {
+        self.v[x] &= self.v[y];
         self.next_pc()
     }
 
-    //TODO
     // Set VX to VX xor VY
     fn op_8XY3(&mut self, x: usize, y: usize) -> u16 {
+        self.v[x] ^= self.v[y];
         self.next_pc()
     }
 
-    //TODO
     // Add VY to VX and use VF as carry bit
+    // 1 for carry, 0 otherwise
     fn op_8XY4(&mut self, x: usize, y: usize) -> u16 {
+        let sum = self.v[x] as u16 + self.v[y] as u16;
+        self.v[x] = sum as u8;
+        self.v[0x0F] = (sum >> 8) as u8;
         self.next_pc()
     }
 
-    //TODO
     // Subtract VY from VX and use VF as borrow bit
+    // 0 for borrow, 1 otherwise
     fn op_8XY5(&mut self, x: usize, y: usize) -> u16 {
+        let borrow = self.v[y] > self.v[x];
+        self.v[x] = self.v[x].wrapping_sub(self.v[y]);
+        self.v[0x0F] = !borrow as u8;
         self.next_pc()
     }
 
-    //TODO
     // Put least significant bit from VX in VF then shift VX right once
     fn op_8XY6(&mut self, x: usize, y: usize) -> u16 {
+        self.v[0x0F] = self.v[x] & 0x01;
+        self.v[x] >>= 1;
         self.next_pc()
     }
 
-    //TODO
     // Set VX to VY - VX and use VF as borrow bit
+    // 0 for borrow, 1 otherwise
     fn op_8XY7(&mut self, x: usize, y: usize) -> u16 {
+        let borrow = self.v[x] > self.v[y];
+        self.v[x] = self.v[y].wrapping_sub(self.v[x]);
+        self.v[0x0F] = !borrow as u8;
         self.next_pc()
     }
 
-    //TODO
     // Put most significant bit from VX in VF then shift VX left once
     fn op_8XYE(&mut self, x: usize, y: usize) -> u16 {
+        self.v[0x0F] = (self.v[x] & 0x80) >> 7;
+        self.v[x] <<= 1;
         self.next_pc()
     }
 
-    //TODO
     // Skip if VX != VY
     fn op_9XY0(&mut self, x: usize, y: usize) -> u16 {
+        if self.v[x] != self.v[y] {
+            self.next_pc();
+        }
         self.next_pc()
     }
 
-    //TODO
     // Set I to NNN
     fn op_ANNN(&mut self, nnn: u16) -> u16 {
+        self.i = nnn;
         self.next_pc()
     }
 
-    //TODO
     // Jump to NNN + V0
     fn op_BNNN(&mut self, nnn: u16) -> u16 {
-        self.next_pc()
+        self.pc = nnn + self.v[0x00] as u16;
+        self.pc
     }
 
-    //TODO
-    // Set VX to NN bitwise and a random number
+    // Set VX to NN anded with a random number (0 to 255)
     fn op_CXNN(&mut self, x: usize, nn: u8) -> u16 {
+        let mut rng = rand::thread_rng();
+        self.v[x] = nn & rng.gen::<u8>();
         self.next_pc()
     }
 
     //TODO
     // Draw a sprite
     fn op_DXYN(&mut self, x: usize, y: usize, n: u8) -> u16 {
+        self.gfx_changed = true;
         self.next_pc()
     }
 
-    //TODO
-    // Skip if key stored in VX is pressed
+    // Skip if key VX is pressed
     fn op_EX9E(&mut self, x: usize) -> u16 {
+        if self.key[self.v[x] as usize] {
+            self.next_pc();
+        }
         self.next_pc()
     }
 
-    //TODO
     // Skip if key stored in VX isn't pressed
     fn op_EXA1(&mut self, x: usize) -> u16 {
+        if !self.key[self.v[x] as usize] {
+            self.next_pc();
+        }
         self.next_pc()
     }
 
-    //TODO
     // Set VX to delay timer
     fn op_FX07(&mut self, x: usize) -> u16 {
+        self.v[x] = self.delay_timer;
         self.next_pc()
     }
 
@@ -284,27 +310,29 @@ impl Cpu {
         self.next_pc()
     }
 
-    //TODO
     // Set delay timer to VX
     fn op_FX15(&mut self, x: usize) -> u16 {
+        self.delay_timer = self.v[x];
         self.next_pc()
     }
 
-    //TODO
     // Set sound timer to VX
     fn op_FX18(&mut self, x: usize) -> u16 {
+        self.sound_timer = self.v[x];
         self.next_pc()
     }
 
-    //TODO
-    // Add VX to I
+    // Add VX to I and set VF as carry bit
     fn op_FX1E(&mut self, x: usize) -> u16 {
+        let sum = self.v[x] as u32 + self.i as u32;
+        self.i = sum as u16;
+        self.v[0x0F] = (sum >> 16) as u8;
         self.next_pc()
     }
 
-    //TODO
     // Set I to location of sprite VX
     fn op_FX29(&mut self, x: usize) -> u16 {
+        self.i = (self.v[x] as usize) * 5;
         self.next_pc()
     }
 
@@ -328,14 +356,19 @@ impl Cpu {
 
     pub fn debug(&self) {
         println!("=== debug start ===");
-        println!("pc:{}", self.pc);
+        println!("  pc = 0x{:X}", self.pc);
+        for i in 0..NUM_REGISTERS {
+            println!("v[{:X}] = 0x{:X}", i, self.v[i]);
+        }
     }
 }
 
 fn main() {
-    let mut cpu = Cpu::new();
+    let mut cpu = Simulator::new();
     cpu.debug();
     //cpu.step(0x00E0);
-    cpu.step(0x3FEA);
+    cpu.step(0x6003);
+    //cpu.step(0x6105);
+    cpu.step(0x8016);
     cpu.debug();
 }
