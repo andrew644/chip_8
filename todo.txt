@@ -1,0 +1,5 @@
+system to load roms
+key presses
+draw the screen
+separate code
+timers

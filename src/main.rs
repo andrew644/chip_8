@@ -6,7 +6,8 @@ use std::io::Read;
 
 const RAM_SIZE: usize = 0x1000; // 4096
 const NUM_REGISTERS: usize = 16;
-const NUM_PIXELS: usize = 64 * 32;
+const SCREEN_HEIGHT: usize = 32;
+const SCREEN_WIDTH: usize = 64;
 const STACK_SIZE: usize = 16;
 const NUM_KEYS: usize = 16;
 const START_PC: usize = 0x200; // 512
@@ -31,13 +32,14 @@ pub struct Simulator {
     stack: [u16; STACK_SIZE],
     sp: u16, // stack pointer
 
-    gfx: [u8; NUM_PIXELS], // graphical memory (the screen)
+    screen: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
     gfx_changed: bool,
 
     delay_timer: u8,
     sound_timer: u8,
 
     key: [bool; NUM_KEYS], // keypad
+    await_key: Option<usize>,
 }
 
 impl Simulator {
@@ -56,11 +58,12 @@ impl Simulator {
             pc: START_PC as u16,
             stack: [0; STACK_SIZE],
             sp: 0,
-            gfx: [0; NUM_PIXELS],
+            screen: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
             gfx_changed: false,
             delay_timer: 0,
             sound_timer: 0,
             key: [false; NUM_KEYS],
+            await_key: None,
         }
     }
 
@@ -140,8 +143,10 @@ impl Simulator {
 
     // Clear the display
     fn op_00E0(&mut self) -> u16 {
-        for i in 0..NUM_PIXELS {
-            self.gfx[i] = 0
+        for y in 0..SCREEN_HEIGHT {
+            for x in 0..SCREEN_WIDTH {
+                self.screen[y][x] = 0;
+            }
         }
         self.gfx_changed = true;
         self.next_pc()
@@ -299,9 +304,21 @@ impl Simulator {
         self.next_pc()
     }
 
-    //TODO
-    // Draw a sprite
+    // Draw a sprite at (VX, VY)
+    // Start at I in ram and draw N lines
+    // Each line is 8 pixels (1 byte from memeroy)
+    // Set VF to 1 if we overwrite a pixel that was already on
     fn op_DXYN(&mut self, x: usize, y: usize, n: u8) -> u16 {
+        self.v[0x0F] = 0;
+        let vx = self.v[x] as usize;
+        let vy = self.v[y] as usize;
+        for line in 0..n as usize {
+            for pixel in 0..8 {
+                let newPixel = (self.ram[self.i as usize + line] >> (7 - pixel)) & 0x01;
+                self.v[0x0F] |= newPixel & self.screen[vy + line][vx + pixel];
+                self.screen[vy + line][vx + pixel] ^= newPixel;
+            }
+        }
         self.gfx_changed = true;
         self.next_pc()
     }
@@ -328,9 +345,9 @@ impl Simulator {
         self.next_pc()
     }
 
-    //TODO
     // Store next key press in VX and block until key is pressed
     fn op_FX0A(&mut self, x: usize) -> u16 {
+        self.await_key = Some(x);
         self.next_pc()
     }
 
@@ -371,11 +388,7 @@ impl Simulator {
 
     // Store V0 to VX in ram starting at I
     fn op_FX55(&mut self, x: usize) -> u16 {
-        let max_reg = match x {
-            0x00...0x0F => x,
-            _ => NUM_REGISTERS - 1, //TODO print warning about out of bounds
-        };
-        for reg in 0..max_reg + 1 {
+        for reg in 0..x + 1 {
             //TODO check for out of bounds on ram
             self.ram[(self.i as usize) + reg] = self.v[reg];
         }
@@ -384,11 +397,7 @@ impl Simulator {
 
     // Load V0 to VX with ram values starting at I
     fn op_FX65(&mut self, x: usize) -> u16 {
-        let max_reg = match x {
-            0x00...0x0F => x,
-            _ => NUM_REGISTERS - 1, //TODO print warning
-        };
-        for reg in 0..max_reg + 1 {
+        for reg in 0..x + 1 {
             //TODO check for out of bounds on ram
             self.v[reg] = self.ram[(self.i as usize) + reg];
         }
@@ -406,15 +415,12 @@ impl Simulator {
 
 fn main() {
     let mut cpu = Simulator::new();
-    /*
-    cpu.debug();
-    //cpu.step(0x00E0);
     cpu.step(0x601A);
     //cpu.step(0x6105);
     cpu.step(0xF033);
     cpu.debug();
-    */
 
+    /*
     let mut file = File::open("roms/TETRIS").unwrap();
     let mut buf = [0u8; RAM_SIZE];
     file.read(&mut buf).unwrap();
@@ -424,4 +430,5 @@ fn main() {
         cpu.step(opcode);
         cpu.debug();
     }
+    */
 }
