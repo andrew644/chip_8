@@ -55,7 +55,6 @@ impl event::EventHandler for MainState {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         let opcode = self.sim.get_opcode();
         self.sim.step(opcode);
-        self.sim.debug();
         Ok(())
     }
 
@@ -483,7 +482,6 @@ fn main() -> GameResult {
     let args: Vec<String> = env::args().collect();
 
     let mut cpu = Simulator::new();
-    cpu.debug();
 
     let mut file = File::open(&args[1]).unwrap();
     let mut buf = [0u8; RAM_SIZE];
@@ -492,7 +490,10 @@ fn main() -> GameResult {
 
     let cb = ggez::ContextBuilder::new("chip8", "ggez")
         .window_setup(conf::WindowSetup::default().title("Chip8"))
-        .window_mode(conf::WindowMode::default().dimensions(1024.0, 756.0));
+        .window_mode(conf::WindowMode::default().dimensions(
+            SCREEN_WIDTH as f32 * PIXEL_SIZE,
+            SCREEN_HEIGHT as f32 * PIXEL_SIZE,
+        ));
     let (ctx, event_loop) = &mut cb.build()?;
     let state = &mut MainState::new_with_sim(ctx, cpu)?;
     event::run(ctx, event_loop, state)
