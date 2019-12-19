@@ -375,13 +375,13 @@ impl Simulator {
     // Set VF to 1 if we overwrite a pixel that was already on
     fn op_dxyn(&mut self, x: usize, y: usize, n: u8) -> u16 {
         self.v[0x0F] = 0;
-        let vx = self.v[x] as usize;
-        let vy = self.v[y] as usize;
         for line in 0..n as usize {
+            let y = (self.v[y] as usize + line) % SCREEN_HEIGHT;
             for pixel in 0..8 {
+                let x = (self.v[x] as usize + pixel) % SCREEN_WIDTH;
                 let new_pixel = (self.ram[self.i as usize + line] >> (7 - pixel)) & 0x01;
-                self.v[0x0F] |= new_pixel & self.screen[vy + line][vx + pixel];
-                self.screen[vy + line][vx + pixel] ^= new_pixel;
+                self.v[0x0F] |= new_pixel & self.screen[y][x];
+                self.screen[y][x] ^= new_pixel;
             }
         }
         self.gfx_changed = true;
