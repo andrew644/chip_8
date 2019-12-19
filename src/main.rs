@@ -7,6 +7,7 @@ use ggez::graphics;
 use ggez::nalgebra as na;
 use ggez::{Context, GameResult};
 
+use std::env;
 use std::fs::File;
 use std::io::Read;
 
@@ -479,13 +480,12 @@ impl Simulator {
 }
 
 fn main() -> GameResult {
+    let args: Vec<String> = env::args().collect();
+
     let mut cpu = Simulator::new();
-    //cpu.step(0x601A);
-    //cpu.step(0x6105);
-    //cpu.step(0xF033);
     cpu.debug();
 
-    let mut file = File::open("roms/test").unwrap();
+    let mut file = File::open(&args[1]).unwrap();
     let mut buf = [0u8; RAM_SIZE];
     file.read(&mut buf).unwrap();
     cpu.load_program(&mut buf);
