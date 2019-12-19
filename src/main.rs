@@ -37,6 +37,7 @@ struct MainState {
 }
 
 impl MainState {
+    #[allow(dead_code)]
     fn new(_ctx: &mut Context) -> GameResult<MainState> {
         let s = MainState {
             sim: Simulator::new(),
