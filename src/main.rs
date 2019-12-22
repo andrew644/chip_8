@@ -307,6 +307,8 @@ impl Simulator {
         let sum = self.v[x] as u16 + self.v[y] as u16;
         self.v[x] = sum as u8;
         self.v[0x0F] = (sum >> 8) as u8;
+        assert!(self.v[0x0F] == 0 || self.v[0x0F] == 1);
+        assert!((sum > 0xFF && self.v[0x0F] == 1) || (sum <= 0xFF && self.v[0x0F] == 0));
         self.next_pc()
     }
 
@@ -316,6 +318,7 @@ impl Simulator {
         let borrow = self.v[y] > self.v[x];
         self.v[x] = self.v[x].wrapping_sub(self.v[y]);
         self.v[0x0F] = !borrow as u8;
+        assert!(self.v[0x0F] == 0 || self.v[0x0F] == 1);
         self.next_pc()
     }
 
@@ -332,12 +335,13 @@ impl Simulator {
         let borrow = self.v[x] > self.v[y];
         self.v[x] = self.v[y].wrapping_sub(self.v[x]);
         self.v[0x0F] = !borrow as u8;
+        assert!(self.v[0x0F] == 0 || self.v[0x0F] == 1);
         self.next_pc()
     }
 
     // Put most significant bit from VX in VF then shift VX left once
     fn op_8xye(&mut self, x: usize) -> u16 {
-        self.v[0x0F] = (self.v[x] & 0x80) >> 7;
+        self.v[0x0F] = (self.v[x] & 0b10000000) >> 7;
         self.v[x] <<= 1;
         self.next_pc()
     }
@@ -432,7 +436,7 @@ impl Simulator {
     fn op_fx1e(&mut self, x: usize) -> u16 {
         let sum = self.v[x] as u32 + self.i as u32;
         self.i = sum as u16;
-        self.v[0x0F] = (sum >> 16) as u8;
+        self.v[0x0F] = if sum > 0xFFFF { 1 } else { 0 };
         self.next_pc()
     }
 
