@@ -4,14 +4,18 @@ extern crate rand;
 use ggez::conf;
 use ggez::event;
 use ggez::graphics;
+use ggez::timer;
 use ggez::nalgebra as na;
 use ggez::{Context, GameResult};
+use ggez::event::{KeyCode, KeyMods};
 
 use std::env;
 use std::fs::File;
 use std::io::Read;
 
 use rand::Rng;
+
+use std::collections::VecDeque;
 
 const RAM_SIZE: usize = 0x1000; // 4096
 const NUM_REGISTERS: usize = 16;
@@ -35,6 +39,8 @@ const FONT_SET: [u8; 80] = [
 
 struct MainState {
     sim: Simulator,
+    keydown_queue: VecDeque<KeyCode>,
+    keyup_queue: VecDeque<KeyCode>,
 }
 
 impl MainState {
@@ -42,17 +48,48 @@ impl MainState {
     fn new(_ctx: &mut Context) -> GameResult<MainState> {
         let s = MainState {
             sim: Simulator::new(),
+            keydown_queue: VecDeque::new(),
+            keyup_queue: VecDeque::new(),
         };
         Ok(s)
     }
     fn new_with_sim(_ctx: &mut Context, simulator: Simulator) -> GameResult<MainState> {
-        let s = MainState { sim: simulator };
+        let s = MainState { sim: simulator, keydown_queue: VecDeque::new(), keyup_queue: VecDeque::new() };
         Ok(s)
     }
 }
 
 impl event::EventHandler for MainState {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
+        // process keydown events
+        while !self.keydown_queue.is_empty() {
+            if let Some(key) = self.keydown_queue.pop_front() {
+                let key_index = get_key_index(key);
+                self.sim.key[key_index] = true;
+                if let Some(wait_key) = self.sim.await_key  {
+                    self.sim.v[wait_key] = key_index as u8;
+                    self.sim.await_key = None;
+                }
+            }
+        }
+
+        // process keyup events
+        while !self.keyup_queue.is_empty() {
+            if let Some(key) = self.keyup_queue.pop_front() {
+                let key_index = get_key_index(key);
+                self.sim.key[key_index] = false;
+            }
+        }
+
+        let _dt = timer::delta(ctx);
+        //TODO use dt
+        if self.sim.sound_timer > 0 {
+            self.sim.sound_timer -= 1;
+        }
+        if self.sim.delay_timer > 0 {
+            self.sim.delay_timer -= 1;
+        }
+
         let opcode = self.sim.get_opcode();
         self.sim.step(opcode);
         Ok(())
@@ -61,7 +98,7 @@ impl event::EventHandler for MainState {
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         graphics::clear(ctx, [0.1, 0.2, 0.3, 1.0].into());
 
-        let circle = graphics::Mesh::new_rectangle(
+        let rect = graphics::Mesh::new_rectangle(
             ctx,
             graphics::DrawMode::fill(),
             graphics::Rect::new(0.0, 0.0, PIXEL_SIZE, PIXEL_SIZE),
@@ -72,7 +109,7 @@ impl event::EventHandler for MainState {
                 if *pixel != 0x00 {
                     graphics::draw(
                         ctx,
-                        &circle,
+                        &rect,
                         (na::Point2::new(
                             0.0 + (x as f32 * PIXEL_SIZE),
                             0.0 + (y as f32 * PIXEL_SIZE),
@@ -84,6 +121,47 @@ impl event::EventHandler for MainState {
 
         graphics::present(ctx)?;
         Ok(())
+    }
+
+    fn key_down_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods, _: bool) {
+        self.keydown_queue.push_back(key);
+    }
+
+    fn key_up_event(&mut self, _ctx: &mut Context, key: KeyCode, _mods: KeyMods) {
+        self.keyup_queue.push_back(key);
+    }
+}
+
+fn get_key_index(key: KeyCode) -> usize {
+    /*
+    Hex layout of keyboard
+    1 2 3 C
+    4 5 6 D
+    7 8 9 E
+    A 0 B F
+    */
+    match key {
+        KeyCode::Key1 => 0x1,
+        KeyCode::Key2 => 0x2,
+        KeyCode::Key3 => 0x3,
+        KeyCode::Key4 => 0xC,
+
+        KeyCode::Q => 0x4,
+        KeyCode::W => 0x5,
+        KeyCode::E => 0x6,
+        KeyCode::R => 0xD,
+
+        KeyCode::A => 0x7,
+        KeyCode::S => 0x8,
+        KeyCode::D => 0x9,
+        KeyCode::F => 0xE,
+
+        KeyCode::Z => 0xA,
+        KeyCode::X => 0x0,
+        KeyCode::C => 0xB,
+        KeyCode::V => 0xF,
+
+        _ => 0x0,
     }
 }
 
